@@ -11,8 +11,12 @@ let
         docker build -t rain-arb-bot .
     '';
 
-    view-images = pkgs.writeShellScriptBin "view" ''
-        docker image
+    view = pkgs.writeShellScriptBin "view" ''
+        docker images
+    '';
+
+    lint = pkgs.writeShellScriptBin "lint" ''
+        eslint --fix ./src
     '';
 
     in
@@ -21,6 +25,7 @@ let
         buildInputs = [
             pkgs.docker
             pkgs.nixpkgs-fmt
+            pkgs.nodePackages.eslint
         ];
 
         shellHook = ''
