@@ -4,7 +4,7 @@ FROM node:16-alpine
 WORKDIR /usr/rain-arb-bot
 
 # Copy only package.json and lock file to take advantage of cached docker layers
-COPY package*.json ./
+COPY package*.json yarn.lock ./
 
 # Install git which is necessary for yarn
 RUN apk add git
