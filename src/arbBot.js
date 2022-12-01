@@ -1,7 +1,6 @@
 // const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
-const dotenv = require('dotenv');
 const ethers = require('ethers');
 const timsort = require('timsort');
 const config = require('./config');
@@ -9,9 +8,7 @@ const { DefaultQuery } = require('./defaultQuery');
 const { bnFromFloat, toFixed18 } = require('./utils');
 const interpreter = require('@beehiveinnovation/rain-interpreter-ts');
 const { abi: FlashBorrowerABI } = require('./abis/arb/ZeroExOrderBookFlashBorrower.sol/ZeroExOrderBookFlashBorrower.json');
-//const { abi: ERC20ABI } = require('./abis/IERC20Upgradeable.sol/IERC20Upgradeable.json')
-dotenv.config();
-
+require('dotenv').config();
 
 
 (async () => {
