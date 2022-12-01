@@ -1,0 +1,54 @@
+{
+    "name": "@beehiveinnovation/rain-orderbook-matchmaker",
+    "version": "0.0.0",
+    "description": "A bot to find and match Rain Orderbook orders",
+    "author": "Beehive Innovation",
+    "license": "CAL-1.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/beehive-innovation/rain-orderbook-matchmaker.git"
+    },
+    "keywords": [],
+    "bugs": {
+        "url": "https://github.com/beehive-innovation/rain-orderbook-matchmaker/issues"
+    },
+    "homepage": "http://beehive-innovation.github.io/rain-orderbook-matchmaker/",
+    "main": "src/matchmaker.js",
+    "module": "src/matchmaker.js",
+    "type": "commonjs",
+    "files": [
+        "src",
+        "docs"
+    ],
+    "scripts": {
+        "run": "./run.js",
+        "test": "hardhat test",
+        "abis": "mkdir -p contracts && cp -r node_modules/@beehiveinnovation/rain-protocol/contracts . && hardhat compile && mkdir -p src/abis && rm -rf src/abis/* && cp -r artifacts/contracts/orderbook/* src/abis",
+        "docgen": "./node_modules/.bin/jsdoc -c jsdoc.config.json",
+        "lint": "eslint ./src --fix"
+    },
+    "dependencies": {
+        "@beehiveinnovation/rain-interpreter-ts": "git+https://github.com/beehive-innovation/rain-interpreter-ts.git#2323addd267d3350542866d262be3917389fc1b1",
+        "@beehiveinnovation/rain-protocol": "git+https://github.com/beehive-innovation/rain-protocol.git#d7ffe19214fb8b3b80c109c46a5868db3b2ade55",
+        "axios": "^1.1.3",
+        "dotenv": "^16.0.3",
+        "eslint": "^8.26.0",
+        "eslint-config-prettier": "^8.5.0",
+        "eslint-plugin-prettier": "^4.2.1",
+        "ethers": "5.7.0",
+        "node-cron": "^3.0.2",
+        "timsort": "^0.3.0"
+    },
+    "devDependencies": {
+        "@nomiclabs/hardhat-ethers": "^2.1.1",
+        "@nomiclabs/hardhat-waffle": "2.0.1",
+        "chai": "^4.3.6",
+        "hardhat": "^2.12.2",
+        "hardhat-contract-sizer": "^2.1.1",
+        "hardhat-gas-reporter": "^1.0.4",
+        "hardhat-storage-layout": "^0.1.6",
+        "jsdoc": "^4.0.0",
+        "jsdoc-to-markdown": "^7.1.1",
+        "mocha": "^10.1.0"
+    }
+}

@@ -1,0 +1,12 @@
+## General
+*.md
+yarn.lock
+.env
+./src/abis
+
+## Generated
+node_modules
+artifacts
+cache
+contracts
+docs

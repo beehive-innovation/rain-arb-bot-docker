@@ -1,0 +1,23 @@
+## Deps
+node_modules
+
+## Generated
+cache
+/contracts
+artifacts
+
+## Private
+.env
+
+## That one annoying file
+.DS_Store
+
+# Logs
+yarn-debug.log*
+yarn-error.log*
+
+# Nix
+shell.nix
+
+# Docker
+Dockerfile
