@@ -89,7 +89,7 @@ require('dotenv').config();
                                     nativeToken.toLowerCase()
                                 }&sellAmount=${
                                     '1' + '0'.repeat(nativeTokenDecimals)
-                                }`,
+                                }`, 
                                 { 
                                     headers: {
                                         'accept-encoding': 'null'
