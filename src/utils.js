@@ -1,4 +1,15 @@
-const { ethers, BigNumber } = require('ethers');
+const { ethers, BigNumber } = require('ethers'); 
+
+/**
+ * @public
+ * Partially emulates `LibFixedPointMath.fixedPointMul` function, but to 18 fixed point decimals.
+ *
+ * @param a First term.
+ * @param b Second term.
+ * @returns `a_` multiplied by `b_` to 18 fixed point decimals.
+ */
+export const fixedPointMul = (a, b) =>
+  a.mul(b).div(ONE);
 
 /**
  * convert float numbers to big number

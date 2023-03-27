@@ -103,6 +103,7 @@ module.exports = [
         apiUrl: 'https://polygon.api.0x.org/',
         defaultRpc: '',
         arbAddress: '',
+        orderBookAddress: '',
         proxyAddress: '',
         nativeToken: {
             symbol: 'MATIC',
@@ -116,60 +117,10 @@ module.exports = [
                 decimals: 6
             } ,
             {
-                symbol: 'USDC',
-                address: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
-                decimals: 6
-            },
-            {
-                symbol: 'BUSD',
-                address: '0x9C9e5fD8bbc25984B178FdCE6117Defa39d2db39',
+                symbol: 'NHT',
+                address: '0x84342e932797FC62814189f01F0Fb05F52519708',
                 decimals: 18
-            },
-            {
-                symbol: 'BUSD',
-                address: '0xdab529f40e671a1d4bf91361c21bf9f0c9712ab7',
-                decimals: 18
-            },
-            {
-                symbol: 'DAI',
-                address: '0x8f3cf7ad23cd3cadbd9735aff958023239c6a063',
-                decimals: 18
-            },
-            {
-                symbol: 'TUSD',
-                address: '0x2e1ad108ff1d8c782fcbbb89aad783ac49586756',
-                decimals: 18
-            },
-            {
-                symbol: 'GUSD',
-                address: '0xc8a94a3d3d2dabc3c1caffffdca6a7543c3e3e65',
-                decimals: 2
-            },
-            {
-                symbol: 'FRAX',
-                address: '0x45c32fa6df82ead1e2ef74d17b76547eddfaff89',
-                decimals: 18
-            },
-            {
-                symbol: 'MUSD',
-                address: '0xe840b73e5287865eec17d250bfb1536704b43b21',
-                decimals: 18
-            },
-            {
-                symbol: 'MAI',
-                address: '0xa3fa99a148fa48d14ed51d610c367c61876997f1',
-                decimals: 18
-            },
-            {
-                symbol: 'STAKE',
-                address: '0xeb5c9e515629b725d3588a55e2a43964dcfde8ca',
-                decimals: 18
-            },
-            {
-                symbol: 'USDD',
-                address: '0xffa4d863c96e743a2e1513824ea006b8d0353c57',
-                decimals: 18
-            },
+            }
         ]
     },
     {

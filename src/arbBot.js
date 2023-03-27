@@ -4,10 +4,13 @@ const cron = require('node-cron');
 const ethers = require('ethers');
 const timsort = require('timsort');
 const config = require('./config');
+const orderConfig = require('./orderConfig.js')
 const { DefaultQuery } = require('./defaultQuery');
-const { bnFromFloat, toFixed18 } = require('./utils');
+const { bnFromFloat, toFixed18, fixedPointMul } = require('./utils');
 const interpreter = require('@beehiveinnovation/rain-interpreter-ts');
 const { abi: FlashBorrowerABI } = require('./abis/arb/ZeroExOrderBookFlashBorrower.sol/ZeroExOrderBookFlashBorrower.json');
+const { abi: OrderBookABI } = require('./abis/OrderBook.sol/OrderBook.json');
+
 require('dotenv').config();
 
 
@@ -16,6 +19,7 @@ require('dotenv').config();
     let chainId
     let trackedTokens
     let arbAddress
+    let orderBookAddress
     // let proxyAddress
     let nativeToken
     let nativeTokenDecimals
@@ -33,6 +37,7 @@ require('dotenv').config();
                     api = config[index].apiUrl
                     trackedTokens = config[index].trackedTokens
                     arbAddress = config[index].arbAddress
+                    orderBookAddress = 
                     // proxyAddress = config[index].proxyAddress
                     nativeToken = config[index].nativeToken.address
                     nativeTokenDecimals = config[index].nativeToken.decimals
@@ -45,7 +50,8 @@ require('dotenv').config();
                     signer.connect(new ethers.providers.JsonRpcProvider(config[index].defaultRpc))
                     api = config[index].apiUrl
                     trackedTokens = config[index].trackedTokens
-                    arbAddress = config[index].arbAddress
+                    arbAddress = config[index].arbAddress 
+                    orderBookAddress = config[index].arbAddress
                     // proxyAddress = config[index].proxyAddress
                     nativeToken = config[index].nativeToken.address
                     nativeTokenDecimals = config[index].nativeToken.decimals
@@ -57,7 +63,10 @@ require('dotenv').config();
         else throw new Error('bot wallet private key not defined')
 
         // instantiating orderbook contract
-        const arb = new ethers.Contract(arbAddress, FlashBorrowerABI, signer)
+        const arb = new ethers.Contract(arbAddress, FlashBorrowerABI, signer) 
+
+        //Initiating OrderBook contract 
+        const orderBook = new ethers.Contract(orderBookAddress, OrderBookABI, signer)
 
         // arrays of token initial token prices based oon WETH for initial match finding
         let priceDescending = [];
@@ -145,158 +154,155 @@ require('dotenv').config();
 
             let threshold;
 
-            // fetching orders that fit the definition of slosh. 
-            const result = await axios.post(
-                'https://api.thegraph.com/subgraphs/name/siddharth2207/orderbook',
-                { query: DefaultQuery },
-                { headers: { 'Content-Type': 'application/json' } },
-            )
+            // No need to fetch data from sg
+            let slosh = orderConfig
 
-            let sloshes = result.data.data.orders
+            // run interpreterTS to get the threshold
+            // @TODO: update jsvm version
+            let state = new interpreter.RainInterpreterTs({
+                sources: slosh.evaluableConfig.sources,
+                constants: slosh.evaluableConfig.constants
+            }) 
 
-            for (let i = 0; i < sloshes.length; i++) {  
+            // threshold for the startegy always changes
+            threshold = (await state.run())[1]
 
-                let slosh = sloshes[i]
-
-                // run interpreterTS to get the threshold
-                let state = new interpreter.RainInterpreterTs({
-                    sources: slosh.stateConfig.sources,
-                    constants: slosh.stateConfig.constants
-                })
-                threshold = (await state.run())[1]
-
-                let inputs_ = slosh.validInputs.map(
-                    e => { 
-                        return {
-                            address : e.tokenVault.token.id,
-                            symbol : e.tokenVault.token.symbol,
-                            decimals: e.tokenVault.token.decimals
-                        }
+            let inputs_ = slosh.validInputs.map(
+                e => { 
+                    return {
+                        address : e.token,
+                        symbol : e.symbol,
+                        decimals: e.decimals
                     }
-                )  
-                let outputs_ = slosh.validOutputs.map(
-                    e => { 
+                }
+            )  
+            let outputs_ =  await Promise.allSettled(
+                slosh.validOutputs.map(
+                    async (e) => { 
                         return { 
-                            address : e.tokenVault.token.id, 
-                            symbol : e.tokenVault.token.symbol,
-                            decimals: e.tokenVault.token.decimals,
-                            balance : ethers.BigNumber.from(
-                                e.tokenVault.balance,
-                            )
+                            address : e.token, 
+                            symbol : e.symbol,
+                            decimals: e.decimals,
+                            balance : await orderBook.vaultBalance(signer.address,e.token,e.vaultId)
                         }
                     }
                 ) 
+            )
 
-                let possibleMatches = []
-                let inputPrice
-                for (let j = 0 ; j < outputs_.length ; j++) {
-                    let output_ = outputs_[j];
+            let possibleMatches = []
+            let inputPrice
+            for (let j = 0 ; j < outputs_.length ; j++) {
+                let output_ = outputs_[j];
 
-                    if (output_.balance.gt(0)) { 
-                        for (let k = 0 ; k < inputs_.length ; k++ ) { 
-                            if (inputs_[k].symbol != output_.symbol) {
-                                inputPrice = priceDescending.filter(
-                                    e => e.address == output_.address
-                                )[0]
-                                let outputPrice = priceAscending.filter(
-                                    e => e.address == inputs_[k].address
-                                )[0]
+                if (output_.balance.gt(0)) { 
+                    for (let k = 0 ; k < inputs_.length ; k++ ) { 
+                        if (inputs_[k].symbol != output_.symbol) {
+                            inputPrice = priceDescending.filter(
+                                e => e.address == output_.address
+                            )[0]
+                            let outputPrice = priceAscending.filter(
+                                e => e.address == inputs_[k].address
+                            )[0]
 
-                                // calculate the ratio from WETH based prices
-                                let ratio = interpreter.fixedPointDiv(
-                                    inputPrice.price,
-                                    outputPrice.price,
-                                    18
-                                )
-
-                                if (!ratio.lt(threshold)) {
-                                    possibleMatches.push({
-                                        outputToken : output_,
-                                        inputToken : inputs_[k],
-                                        inputIndex: k,
-                                        outputIndex: j
-                                    })
-                                }
-                            }
-                        }
-                    } 
-                }  
-
-                if (possibleMatches.length > 1) {
-                    timsort.sort(
-                        possibleMatches,
-                        (a, b) => a.ratio.gt(b.ratio) ? -1 : a.ratio.lt(b.ratio) ? 1 : 0
-                    )
-                    for (let j = 0; j < possibleMatches.length; j++) {
-                        let bestPossibleMatch = possibleMatches[j]
-                        let res = (await axios.get(
-                            `${
-                                api
-                            }swap/v1/quote?buyToken=${
-                                bestPossibleMatch.inputToken.address
-                            }&sellToken=${
-                                bestPossibleMatch.outputToken.address
-                            }&sellAmount=${
-                                bestPossibleMatch.outputToken.balance.toString()
-                            }&takerAddress=${
-                                signer.address
-                            }`,
-                            {
-                                headers: {
-                                    'accept-encoding': 'null'
-                                }
-                            }
-                        ))
-                        let txQuote = res?.data
-                        if (txQuote && txQuote.guaranteedPrice) {
-                            const guaranteedPrice = toFixed18(
-                                bnFromFloat(
-                                    txQuote.guaranteedPrice,
-                                    bestPossibleMatch.inputToken.decimals
-                                ),
+                            // calculate the ratio from WETH based prices
+                            let ratio = interpreter.fixedPointDiv(
+                                inputPrice.price,
+                                outputPrice.price,
                                 18
                             )
-                            const gasCost = (inputPrice.price.mul(
-                                toFixed18(
-                                    ethers.BigNumber.from(txQuote.gas).mul(txQuote.gasPrice),
-                                    nativeTokenDecimals
-                                )
-                            )).div(
-                                '1000000000000000000'
-                            )
 
-                            if (!(guaranteedPrice.sub(gasCost)).lt(threshold)) {
-                                console.log('found a match, submiting the transaction now...') 
-                                const takeOrder = {
-                                    order: {
-                                        owner: slosh.owner,
-                                        interpreter: slosh.interpreter,
-                                        dispatch: slosh.dispatch,
-                                        handleIODispatch: slosh.handleIODispatch,
-                                        validInputs: slosh.validInputs,
-                                        validOutputs: slosh.validOutputs
-                                    },
-                                    inputIOIndex: bestPossibleMatch.inputIndex,
-                                    outputIOIndex: bestPossibleMatch.outputIndex,
-                                };
-                                const takeOrdersConfigStruct = {
-                                    output: bestPossibleMatch.inputToken,
-                                    input: bestPossibleMatch.outputToken,
-                                    minimumInput: bestPossibleMatch.balance,
-                                    maximumInput: bestPossibleMatch.balance,
-                                    // @TODO: handle threshold conversion based on decimals
-                                    maximumIORatio: threshold,
-                                    orders: [takeOrder],
-                                };
-                                const spender = txQuote.allowanceTarget;
-                                const data = txQuote.data;
-
-                                placeOrder(takeOrdersConfigStruct, spender, data)
+                            if (!ratio.lt(threshold)) {
+                                possibleMatches.push({
+                                    outputToken : output_,
+                                    inputToken : inputs_[k],
+                                    inputIndex: k,
+                                    outputIndex: j
+                                })
                             }
+                        }
+                    }
+                } 
+            }  
+
+            if (possibleMatches.length > 1) {
+                timsort.sort(
+                    possibleMatches,
+                    (a, b) => a.ratio.gt(b.ratio) ? -1 : a.ratio.lt(b.ratio) ? 1 : 0
+                )
+                for (let j = 0; j < possibleMatches.length; j++) {
+                    let bestPossibleMatch = possibleMatches[j]
+                    let res = (await axios.get(
+                        `${
+                            api
+                        }swap/v1/quote?buyToken=${
+                            bestPossibleMatch.inputToken.address
+                        }&sellToken=${
+                            bestPossibleMatch.outputToken.address
+                        }&sellAmount=${
+                            bestPossibleMatch.outputToken.balance.toString()
+                        }&takerAddress=${
+                            signer.address
+                        }`,
+                        {
+                            headers: {
+                                'accept-encoding': 'null'
+                            }
+                        }
+                    ))
+                    let txQuote = res?.data
+                    if (txQuote && txQuote.guaranteedPrice) {
+                        const guaranteedPrice = toFixed18(
+                            bnFromFloat(
+                                txQuote.guaranteedPrice,
+                                bestPossibleMatch.inputToken.decimals
+                            ),
+                            18
+                        )
+                        const gasCost = (inputPrice.price.mul(
+                            toFixed18(
+                                ethers.BigNumber.from(txQuote.gas).mul(txQuote.gasPrice),
+                                nativeTokenDecimals
+                            )
+                        )).div(
+                            '1000000000000000000'
+                        )
+
+                        if (!(guaranteedPrice.sub(gasCost)).lt(threshold)) {
+                            console.log('found a match, submiting the transaction now...') 
+                            const takeOrder = {
+                                order: {
+                                    owner: slosh.owner,
+                                    handleIO: slosh.handleIO,
+                                    evaluable: slosh.evaluable,
+                                    validInputs: slosh.validInputs,
+                                    validOutputs: slosh.validOutputs
+                                },
+                                inputIOIndex: bestPossibleMatch.inputIndex,
+                                outputIOIndex: bestPossibleMatch.outputIndex,
+                                signedContext: [] 
+                            }; 
+                            const maximumIORatio = fixedPointMul(
+                                threshold,
+                                ethers.BigNumber.from(10).pow(18 + tokenADecimals - tokenBDecimals)
+                                );
+                            const takeOrdersConfigStruct = {
+                                output: bestPossibleMatch.inputToken,
+                                input: bestPossibleMatch.outputToken,
+                                minimumInput: bestPossibleMatch.balance,
+                                maximumInput: bestPossibleMatch.balance,
+                                // @TODO: handle threshold conversion based on decimals
+                                maximumIORatio: maximumIORatio,
+                                orders: [takeOrder],
+                            };
+                            const spender = txQuote.allowanceTarget;
+                            const data = txQuote.data;
+
+                            placeOrder(takeOrdersConfigStruct, spender, data)
                         }
                     }
                 }
             }
+            
         } 
 
         const placeOrder = async(takeOrdersConfig, spender, data) => { 
